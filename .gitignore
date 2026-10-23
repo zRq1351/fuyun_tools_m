@@ -1,0 +1,14 @@
+# Gradle / Android build output
+.gradle/
+build/
+app/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Keystore（签名文件不要入库）
+*.jks
+*.keystore
