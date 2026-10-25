@@ -21,3 +21,6 @@ local.properties
 # Keystore（签名文件不要入库）
 *.jks
 *.keystore
+
+# Kotlin 编译日志（构建噪音）
+.kotlin/
