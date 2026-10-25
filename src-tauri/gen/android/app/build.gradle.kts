@@ -14,6 +14,16 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Release 签名配置（keystore.properties 不存在时跳过，debug 构建不受影响）
+// keystore.properties 已加入 .gitignore，切勿提交
+val keystoreProperties = Properties().apply {
+    val propFile = file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+val hasKeystore = keystoreProperties.getProperty("storeFile") != null
+
 android {
     compileSdk = 37
     namespace = "com.fuyun.clipboard"
@@ -24,6 +34,16 @@ android {
         targetSdk = 37
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -41,6 +61,9 @@ android {
         getByName("release") {
             optimization {
                enable = true
+            }
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
             }
             proguardFiles(
                 *fileTree(".") {

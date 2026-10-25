@@ -24,3 +24,6 @@ local.properties
 
 # Kotlin 编译日志（构建噪音）
 .kotlin/
+
+# Release 签名凭据（含密码，永不入库）
+src-tauri/gen/android/keystore.properties
