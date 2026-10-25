@@ -1,4 +1,13 @@
-# Gradle / Android build output
+# Node / frontend build output
+node_modules/
+dist/
+
+# Rust / Tauri build output
+src-tauri/target/
+src-tauri/gen/android/app/build/
+src-tauri/gen/android/build/
+
+# Android
 .gradle/
 build/
 app/build/

@@ -1,0 +1,24 @@
+[package]
+name = "fuyun-tools-m"
+version = "1.0.0"
+description = "浮云剪贴板移动端（Tauri）"
+authors = ["zrq"]
+edition = "2021"
+
+[lib]
+name = "fuyun_tools_m_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", default-features = false, features = ["wry", "devtools"] }
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.13.3", default-features = false, features = ["rustls", "json"] }
+tokio = { version = "1", features = ["sync", "time", "rt", "macros"] }
+base64 = "0.22.1"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+log = "0.4"

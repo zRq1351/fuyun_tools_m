@@ -1,0 +1,277 @@
+:root {
+  --primary: #1a73e8;
+  --primary-dark: #1765cc;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1f2329;
+  --text-secondary: #8a9099;
+  --border: #e8eaed;
+  --error: #d93025;
+  --success: #1e8e3e;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 品牌区 */
+.brand {
+  text-align: center;
+  padding: 32px 0 12px;
+}
+
+.brand-icon {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.brand h1 {
+  margin: 12px 0 4px;
+  font-size: 24px;
+}
+
+.brand-sub {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* 卡片 */
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.card-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+/* 表单 */
+.field {
+  display: block;
+}
+
+.field-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: var(--primary);
+}
+
+.code-input {
+  font-size: 28px;
+  letter-spacing: 10px;
+  text-align: center;
+  font-family: 'SF Mono', Menlo, monospace;
+  padding-left: 20px;
+}
+
+.textarea {
+  resize: none;
+  margin-bottom: 12px;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--error);
+  font-size: 13px;
+  margin: 0;
+  text-align: center;
+}
+
+/* 按钮 */
+.btn-primary,
+.btn-tonal {
+  border: none;
+  border-radius: 10px;
+  padding: 13px 20px;
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  width: 100%;
+}
+
+.btn-primary:active {
+  background: var(--primary-dark);
+}
+
+.btn-primary:disabled,
+.btn-tonal:disabled {
+  opacity: 0.5;
+}
+
+.btn-tonal {
+  background: #e8f0fe;
+  color: var(--primary);
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+}
+
+.flex {
+  flex: 1;
+}
+
+.btn-text {
+  border: none;
+  background: none;
+  color: var(--primary);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+
+.btn-clipboard {
+  display: block;
+  margin: 4px auto 0;
+}
+
+.hidden-input {
+  display: none;
+}
+
+/* 状态条 */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.dot-on {
+  background: var(--success);
+}
+
+.dot-off {
+  background: #f9ab00;
+}
+
+/* 收到的内容 */
+.item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.item:active {
+  background: #f8f9fa;
+}
+
+.item-text {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-image {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+.item-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 20px;
+  z-index: 100;
+  max-width: 80%;
+  text-align: center;
+}
