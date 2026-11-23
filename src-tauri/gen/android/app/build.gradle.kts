@@ -16,8 +16,10 @@ val tauriProperties = Properties().apply {
 
 // Release 签名配置（keystore.properties 不存在时跳过，debug 构建不受影响）
 // keystore.properties 已加入 .gitignore，切勿提交
+// 注意：keystore.properties 位于 android/ 根目录，不在 app/ 模块目录下，
+// 必须用 rootProject.file 定位，否则 hasKeystore 恒为 false，产物始终是 unsigned。
 val keystoreProperties = Properties().apply {
-    val propFile = file("keystore.properties")
+    val propFile = rootProject.file("keystore.properties")
     if (propFile.exists()) {
         propFile.inputStream().use { load(it) }
     }
@@ -28,7 +30,10 @@ android {
     compileSdk = 37
     namespace = "com.fuyun.clipboard"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
+        // 局域网同步服务走明文 HTTP；release 同样放行 cleartext
+        // （此前仅 debug 放开，release 为 false，虽不影响纯 Rust reqwest，
+        //  但为 WebView/插件层面的任何 http 请求排除嫌疑）
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
         applicationId = "com.fuyun.clipboard"
         minSdk = 24
         targetSdk = 37

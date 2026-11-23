@@ -6,6 +6,22 @@
 use super::sync_proto::*;
 use base64::Engine;
 
+/// 展开 reqwest 错误的完整 source 链。
+///
+/// reqwest 的 Display 只显示顶层消息（如 "error sending request for url"），
+/// 底层真实原因（connect timeout / connection refused / network unreachable /
+/// DNS 失败等）藏在 `e.source()` 链里。局域网连接排障时必须展开，
+/// 否则用户只看到一句没有信息量的「无法连接电脑」。
+fn describe_net_error(e: &reqwest::Error) -> String {
+    let mut msg = e.to_string();
+    let mut src = std::error::Error::source(&e);
+    while let Some(s) = src {
+        msg.push_str(&format!(" | 底层原因: {}", s));
+        src = s.source();
+    }
+    msg
+}
+
 pub struct SyncClient {
     http: reqwest::Client,
 }
@@ -32,13 +48,13 @@ impl SyncClient {
             .get(format!("{}/api/status", Self::base(host, port)))
             .send()
             .await
-            .map_err(|e| format!("无法连接电脑：{}", e))?;
+            .map_err(|e| format!("无法连接电脑：{}", describe_net_error(&e)))?;
         if !resp.status().is_success() {
             return Err(format!("连接失败（HTTP {}）", resp.status().as_u16()));
         }
         resp.json::<StatusResponse>()
             .await
-            .map_err(|e| format!("响应解析失败：{}", e))
+            .map_err(|e| format!("响应解析失败：{}", describe_net_error(&e)))
     }
 
     /// 配对：配对码换设备令牌
@@ -52,13 +68,13 @@ impl SyncClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| format!("无法连接电脑：{}", e))?;
+            .map_err(|e| format!("无法连接电脑：{}", describe_net_error(&e)))?;
         match resp.status().as_u16() {
             403 => Err("配对码无效或已过期".to_string()),
             200 => resp
                 .json::<PairResponse>()
                 .await
-                .map_err(|e| format!("响应解析失败：{}", e)),
+                .map_err(|e| format!("响应解析失败：{}", describe_net_error(&e))),
             code => Err(format!("配对失败（HTTP {}）", code)),
         }
     }
@@ -116,7 +132,7 @@ impl SyncClient {
             .json(body)
             .send()
             .await
-            .map_err(|e| format!("发送失败：{}", e))?;
+            .map_err(|e| format!("发送失败：{}", describe_net_error(&e)))?;
         match resp.status().as_u16() {
             200 => Ok(()),
             401 => Err("认证失败，请重新配对".to_string()),
@@ -142,12 +158,12 @@ impl SyncClient {
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await
-            .map_err(|e| format!("拉取失败：{}", e))?;
+            .map_err(|e| format!("拉取失败：{}", describe_net_error(&e)))?;
         match resp.status().as_u16() {
             200 => resp
                 .json::<Vec<HistoryItem>>()
                 .await
-                .map_err(|e| format!("响应解析失败：{}", e)),
+                .map_err(|e| format!("响应解析失败：{}", describe_net_error(&e))),
             401 => Err("认证失败，请重新配对".to_string()),
             code => Err(format!("拉取失败（HTTP {}）", code)),
         }
@@ -167,13 +183,13 @@ impl SyncClient {
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await
-            .map_err(|e| format!("下载失败：{}", e))?;
+            .map_err(|e| format!("下载失败：{}", describe_net_error(&e)))?;
         if !resp.status().is_success() {
             return Err(format!("下载失败（HTTP {}）", resp.status().as_u16()));
         }
         resp.bytes()
             .await
             .map(|b| b.to_vec())
-            .map_err(|e| format!("读取图片失败：{}", e))
+            .map_err(|e| format!("读取图片失败：{}", describe_net_error(&e)))
     }
 }

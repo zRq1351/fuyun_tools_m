@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      Android 17 (API 37) 起「本地网络保护」对 targetSdk>=37 的应用强制生效：
+      未持有该运行时权限时，访问局域网地址（含内网 IP 的 TCP 连接）会被网络栈直接丢弃，
+      表现为连接超时（tcp connect error | deadline has elapsed），而公网访问不受影响。
+      targetSdk=37 的构建若缺少此声明，手机将完全无法连接电脑端同步服务。
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
