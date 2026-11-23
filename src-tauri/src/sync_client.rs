@@ -136,6 +136,7 @@ impl SyncClient {
         match resp.status().as_u16() {
             200 => Ok(()),
             401 => Err("认证失败，请重新配对".to_string()),
+            413 => Err("图片过大，超过电脑端 32MB 接收上限".to_string()),
             code => Err(format!("发送失败（HTTP {}）", code)),
         }
     }
