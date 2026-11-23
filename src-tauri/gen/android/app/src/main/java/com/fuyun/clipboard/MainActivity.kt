@@ -3,14 +3,34 @@ package com.fuyun.clipboard
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     ensureLocalNetworkPermission()
+    applyTopInsetsPadding()
+  }
+
+  /**
+   * WebView 全屏铺满（enableEdgeToEdge + viewport-fit=cover），顶栏会画进状态栏
+   * 被时间/电量图标遮挡。targetSdk 35+ 上 edge-to-edge 被系统强制、
+   * setDecorFitsSystemWindows 已失效，只能给 content 根视图加状态栏 + 刘海高度的 padding。
+   */
+  private fun applyTopInsetsPadding() {
+    val root = findViewById<ViewGroup>(android.R.id.content) ?: return
+    ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+      val bars = insets.getInsets(
+        WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+      )
+      v.setPadding(v.paddingLeft, bars.top, v.paddingRight, v.paddingBottom)
+      insets
+    }
   }
 
   /**
