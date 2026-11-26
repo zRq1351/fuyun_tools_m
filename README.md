@@ -53,7 +53,8 @@ npm run tauri android build --apk       # 发布包（APK，未加 --apk 出的�
 | 推送 `v*` 标签（如 `git tag v1.0.1 && git push origin v1.0.1`） | 构建签名 APK → 自动创建 GitHub Release 并上传 |
 | Actions 页面手动 Run workflow（可填版本号） | 只构建并上传 Artifact（Actions 运行页可下载，保留 30 天） |
 
-**产物命名**：`fuyun-clipboard-<版本>-universal.apk`（全 ABI 合集）、`-arm64-v8a.apk` 等。
+**产物命名**：`fuyun-<版本>-arm64-v8a.apk`（推荐，约 18 MB）、`-armeabi-v7a` / `-x86_64` / `-x86`（分 ABI 小包），
+以及 `-universal.apk`（全 ABI 合集，约 59 MB，不确定机型时用）。
 
 **所需 Secrets**（Settings → Secrets and variables → Actions）
 
