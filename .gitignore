@@ -33,3 +33,6 @@ output/
 artifacts/
 *.log
 
+# 工作区记忆（本地）
+.workbuddy/
+
