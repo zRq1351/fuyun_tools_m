@@ -3,7 +3,9 @@ package com.fuyun.clipboard
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
@@ -20,17 +22,39 @@ class MainActivity : TauriActivity() {
   }
 
   /**
-   * 返回键回桌面而不是 finish。
-   * TauriActivity 的 handleBackNavigation = false，默认行为是直接结束 Activity，
-   * 用户一按返回就把同步循环杀了，重新进来还得等重新连。
-   * 这里改成 moveTaskToBack：App 退到后台，回到前台仍是当前状态。
+   * 返回键：扫码中先关扫码，否则回桌面而不是 finish。
+   *
+   * - TauriActivity 的 handleBackNavigation = false，默认行为是直接结束 Activity，
+   *   用户一按返回就把同步循环杀了，重新进来还得等重新连，所以非扫码时改成 moveTaskToBack。
+   * - barcode-scanner 的扫码画面是 addView 到 WebView 父容器上的原生 View，自身既没有
+   *   关闭按钮也不处理返回键。这里问一下前端「是否正在扫码」，是就让它调插件 cancel。
    */
   private fun handleBackKey() {
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
-        moveTaskToBack(true)
+        val webView = findWebView(window.decorView)
+        if (webView == null) {
+          moveTaskToBack(true)
+          return
+        }
+        webView.evaluateJavascript(
+          "(window.__fuyunHandleBack && window.__fuyunHandleBack()) || '0'",
+        ) { result ->
+          // 前端返回 '1' 表示已消费本次返回（关掉了扫码界面）
+          if (result?.trim('"') != "1") moveTaskToBack(true)
+        }
       }
     })
+  }
+
+  private fun findWebView(v: View): WebView? {
+    if (v is WebView) return v
+    if (v is ViewGroup) {
+      for (i in 0 until v.childCount) {
+        findWebView(v.getChildAt(i))?.let { return it }
+      }
+    }
+    return null
   }
 
   /**

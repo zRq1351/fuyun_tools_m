@@ -210,6 +210,7 @@
 <script setup>
 import {computed, onMounted, onUnmounted, reactive, ref} from 'vue'
 import {listen} from '@tauri-apps/api/event'
+import {invoke} from '@tauri-apps/api/core'
 import {Format, requestPermissions, scan} from '@tauri-apps/plugin-barcode-scanner'
 import {api} from './api'
 
@@ -281,6 +282,28 @@ function showToast(msg) {
   toast.value = msg
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), 2200)
+}
+
+/**
+ * 关闭扫码界面。
+ * 插件的扫码画面是直接挂在 WebView 父容器上的原生 View，没有关闭按钮，
+ * 只能通过 cancel 命令销毁。
+ */
+function cancelScan() {
+  invoke('plugin:barcode-scanner|cancel').catch(() => {})
+}
+
+let scanningActive = false
+
+/**
+ * 原生返回键的落点：扫码中返回 '1' 表示已消费（关掉扫码），
+ * 否则返回 '0' 让原生退到桌面。
+ */
+window.__fuyunHandleBack = () => {
+  if (!scanningActive) return '0'
+  scanningActive = false
+  cancelScan()
+  return '1'
 }
 
 /** Tauri 抛的错误可能是字符串、Error 或普通对象，统一取可读文本 */
@@ -458,6 +481,7 @@ function applyPairInfo(text) {
 
 /** 扫码配对：电脑端「手机同步」页展示二维码 */
 async function onScanQr() {
+  let timer = null
   try {
     // 插件不会自动申请相机权限，必须显式请求，否则 scan() 直接抛错
     const perm = await requestPermissions()
@@ -465,7 +489,13 @@ async function onScanQr() {
       showToast('需要相机权限才能扫码，请在系统设置里允许')
       return
     }
+    // 45 秒没扫到就自动关掉，避免一直停在相机画面（界面本身没有取消按钮）
+    timer = setTimeout(() => {
+      cancelScan()
+      showToast('扫码超时，已退出')
+    }, 45000)
     // windowed 模式在部分机型上 overlay 不显示（相机在跑但界面不可见），用原生全屏扫描界面
+    scanningActive = true
     const res = await scan({windowed: false, formats: [Format.QRCode]})
     // 用户取消时可能返回 null 而不是抛错
     if (!res || !res.content) return
@@ -480,6 +510,9 @@ async function onScanQr() {
       return
     }
     showToast(msg.slice(0, 80) || '扫码失败，请重试')
+  } finally {
+    if (timer) clearTimeout(timer)
+    scanningActive = false
   }
 }
 
