@@ -151,6 +151,28 @@ async fn sync_stop_loop(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 远程开启电脑端投屏（手机 App「投屏到电脑」入口）
+#[tauri::command]
+async fn sync_mirror_start(
+    host: String,
+    port: u16,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = SyncClient::new();
+    client.mirror_start(&host, port, &token).await
+}
+
+/// 查询电脑端投屏会话状态
+#[tauri::command]
+async fn sync_mirror_status(
+    host: String,
+    port: u16,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = SyncClient::new();
+    client.mirror_status(&host, port, &token).await
+}
+
 fn sync_stop_loop_inner(app: &AppHandle) {
     let state = loop_state(app);
     state.running.store(false, Ordering::SeqCst);
@@ -292,6 +314,8 @@ pub fn run() {
             sync_push_image,
             sync_start_loop,
             sync_stop_loop,
+            sync_mirror_start,
+            sync_mirror_status,
             sync_write_image_clipboard,
             clipboard_read_text,
             clipboard_write_text,

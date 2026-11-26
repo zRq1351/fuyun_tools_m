@@ -85,6 +85,17 @@
       </div>
 
       <div class="card">
+        <h2 class="card-title">投屏到电脑</h2>
+        <p class="hint">
+          通过同步连接远程开启电脑端的手机投屏，电脑会自动弹出投屏窗口
+        </p>
+        <button class="btn-primary" :disabled="mirroring" @click="onMirrorStart">
+          {{ mirroring ? '开启中…' : '投屏到电脑' }}
+        </button>
+        <p v-if="mirrorStatusText" class="hint">{{ mirrorStatusText }}</p>
+      </div>
+
+      <div class="card">
         <h2 class="card-title">收到的内容</h2>
         <p v-if="items.length === 0" class="hint">
           电脑复制的内容会出现在这里，并自动写入剪贴板
@@ -118,6 +129,8 @@ const loopRunning = ref(false)
 const draft = ref('')
 const items = ref([])
 const fileInput = ref(null)
+const mirroring = ref(false)
+const mirrorStatusText = ref('')
 const form = reactive({host: '', code: ''})
 let unlistenItem = null
 let toastTimer = null
@@ -139,6 +152,7 @@ onMounted(async () => {
       if (cfg.token) {
         paired.value = true
         await startLoop()
+        refreshMirrorStatus()
       }
     } catch {}
   }
@@ -271,6 +285,39 @@ function fileToBase64(file) {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+// 远程开启电脑端投屏：复用同步令牌走后端 HTTP，电脑自动弹出投屏窗口
+async function onMirrorStart() {
+  mirroring.value = true
+  try {
+    const saved = JSON.parse(localStorage.getItem('fuyun-sync'))
+    const r = await api.mirrorStart(saved.host, saved.port, saved.token)
+    if (r && r.ok) {
+      mirrorStatusText.value = `投屏运行中${r.deviceName ? `（${r.deviceName}）` : ''}`
+      showToast('投屏已开启，请看电脑屏幕')
+    } else {
+      mirrorStatusText.value = ''
+      showToast((r && r.error) || '开启失败')
+    }
+  } catch (e) {
+    showToast(String(e))
+  } finally {
+    mirroring.value = false
+  }
+}
+
+async function refreshMirrorStatus() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('fuyun-sync') || '{}')
+    if (!saved.token) return
+    const r = await api.mirrorStatus(saved.host, saved.port, saved.token)
+    if (r && r.running) {
+      mirrorStatusText.value = `投屏运行中${r.deviceName ? `（${r.deviceName}）` : ''}`
+    } else {
+      mirrorStatusText.value = ''
+    }
+  } catch { /* 状态查询失败不打扰用户 */ }
 }
 
 async function onCopyItem(item) {

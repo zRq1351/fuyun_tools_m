@@ -34,4 +34,12 @@ export const api = {
     /** 按历史条目 id 重新下载图片并写入本机剪贴板 */
     writeImageToClipboard: (host, port, token, id) =>
         invoke('sync_write_image_clipboard', {host, port, token, id}),
+
+    /** 远程开启电脑端投屏（电脑需已开启同步服务） */
+    mirrorStart: (host, port, token) =>
+        invoke('sync_mirror_start', {host, port, token}),
+
+    /** 查询电脑端投屏会话状态 */
+    mirrorStatus: (host, port, token) =>
+        invoke('sync_mirror_status', {host, port, token}),
 }

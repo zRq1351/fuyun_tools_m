@@ -141,6 +141,54 @@ impl SyncClient {
         }
     }
 
+    /// 手机 → PC：远程开启投屏（PC 端弹出投屏窗口）
+    pub async fn mirror_start(
+        &self,
+        host: &str,
+        port: u16,
+        token: &str,
+    ) -> Result<serde_json::Value, String> {
+        let resp = self
+            .http
+            .post(format!("{}/api/mirror/start", Self::base(host, port)))
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|e| format!("请求失败：{}", describe_net_error(&e)))?;
+        match resp.status().as_u16() {
+            200 => resp
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|e| format!("响应解析失败：{}", describe_net_error(&e))),
+            401 => Err("认证失败，请重新配对".to_string()),
+            code => Err(format!("请求失败（HTTP {}）", code)),
+        }
+    }
+
+    /// 手机 → PC：查询投屏会话状态
+    pub async fn mirror_status(
+        &self,
+        host: &str,
+        port: u16,
+        token: &str,
+    ) -> Result<serde_json::Value, String> {
+        let resp = self
+            .http
+            .get(format!("{}/api/mirror/status", Self::base(host, port)))
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+            .map_err(|e| format!("请求失败：{}", describe_net_error(&e)))?;
+        match resp.status().as_u16() {
+            200 => resp
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|e| format!("响应解析失败：{}", describe_net_error(&e))),
+            401 => Err("认证失败，请重新配对".to_string()),
+            code => Err(format!("请求失败（HTTP {}）", code)),
+        }
+    }
+
     /// 拉取 since 之后的新历史条目
     pub async fn history(
         &self,
