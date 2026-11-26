@@ -160,7 +160,7 @@ jobs:
             echo "  ANDROID_KEYSTORE_PASSWORD   = keystore 口令"
             echo "  ANDROID_KEY_ALIAS           = 密钥别名（如 fuyun）"
             echo "  ANDROID_KEY_PASSWORD        = 密钥口令"
-            echo "本地生成 base64：base64 -w0 fuyun-clipboard.keystore > keystore.b64"
+            echo "本地生成 base64：base64 -w0 fuyun.keystore > keystore.b64"
             exit 1
           fi
 
@@ -194,12 +194,12 @@ jobs:
           found=0
           while IFS= read -r f; do
             case "$f" in
-              *universal*)  out="fuyun-clipboard-${VERSION}-universal.apk" ;;
-              *arm64*)      out="fuyun-clipboard-${VERSION}-arm64-v8a.apk" ;;
-              *armv7*|*armeabi*) out="fuyun-clipboard-${VERSION}-armeabi-v7a.apk" ;;
-              *x86_64*)     out="fuyun-clipboard-${VERSION}-x86_64.apk" ;;
-              *x86*)        out="fuyun-clipboard-${VERSION}-x86.apk" ;;
-              *)            out="fuyun-clipboard-${VERSION}-$(basename "$f")" ;;
+              *universal*)  out="fuyun-${VERSION}-universal.apk" ;;
+              *arm64*)      out="fuyun-${VERSION}-arm64-v8a.apk" ;;
+              *armv7*|*armeabi*) out="fuyun-${VERSION}-armeabi-v7a.apk" ;;
+              *x86_64*)     out="fuyun-${VERSION}-x86_64.apk" ;;
+              *x86*)        out="fuyun-${VERSION}-x86.apk" ;;
+              *)            out="fuyun-${VERSION}-$(basename "$f")" ;;
             esac
             cp "$f" "artifacts/$out"
             echo "产物：$out ($(du -h "$f" | cut -f1))"
@@ -229,7 +229,7 @@ jobs:
       - name: 上传构建产物（Artifact）
         uses: actions/upload-artifact@v4
         with:
-          name: fuyun-clipboard-apk-${{ steps.ver.outputs.version }}
+          name: fuyun-apk-${{ steps.ver.outputs.version }}
           path: artifacts/*.apk
           retention-days: 30
           if-no-files-found: error
