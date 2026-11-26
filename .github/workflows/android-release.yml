@@ -238,7 +238,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: 浮云剪贴板 ${{ steps.ver.outputs.version }}
+          name: fuyun_tools ${{ steps.ver.outputs.version }}
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
