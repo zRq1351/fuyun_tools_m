@@ -293,18 +293,11 @@ function cancelScan() {
   invoke('plugin:barcode-scanner|cancel').catch(() => {})
 }
 
-let scanningActive = false
-
 /**
- * 原生返回键的落点：扫码中返回 '1' 表示已消费（关掉扫码），
- * 否则返回 '0' 让原生退到桌面。
+ * 供原生返回键调用：扫码画面没有关闭按钮，只能通过插件的 cancel 命令销毁。
+ * 原生侧用视图层级判断是否在扫码，这里只负责执行关闭。
  */
-window.__fuyunHandleBack = () => {
-  if (!scanningActive) return '0'
-  scanningActive = false
-  cancelScan()
-  return '1'
-}
+window.__fuyunCancelScan = cancelScan
 
 /** Tauri 抛的错误可能是字符串、Error 或普通对象，统一取可读文本 */
 function errorText(e) {
@@ -495,7 +488,6 @@ async function onScanQr() {
       showToast('扫码超时，已退出')
     }, 45000)
     // windowed 模式在部分机型上 overlay 不显示（相机在跑但界面不可见），用原生全屏扫描界面
-    scanningActive = true
     const res = await scan({windowed: false, formats: [Format.QRCode]})
     // 用户取消时可能返回 null 而不是抛错
     if (!res || !res.content) return
@@ -512,7 +504,6 @@ async function onScanQr() {
     showToast(msg.slice(0, 80) || '扫码失败，请重试')
   } finally {
     if (timer) clearTimeout(timer)
-    scanningActive = false
   }
 }
 

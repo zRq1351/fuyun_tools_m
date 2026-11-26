@@ -24,27 +24,38 @@ class MainActivity : TauriActivity() {
   /**
    * 返回键：扫码中先关扫码，否则回桌面而不是 finish。
    *
-   * - TauriActivity 的 handleBackNavigation = false，默认行为是直接结束 Activity，
-   *   用户一按返回就把同步循环杀了，重新进来还得等重新连，所以非扫码时改成 moveTaskToBack。
-   * - barcode-scanner 的扫码画面是 addView 到 WebView 父容器上的原生 View，自身既没有
-   *   关闭按钮也不处理返回键。这里问一下前端「是否正在扫码」，是就让它调插件 cancel。
+   * barcode-scanner 的扫码画面是 addView 到 WebView 父容器上的原生 View
+   * （PreviewView + GraphicOverlay），自身既没有关闭按钮也不处理返回键。
+   * 不能用 JS 侧的状态标志判断——页面重载后标志会归零，但原生 View 还在，
+   * 于是按返回就会误判成"没在扫码"，直接把 App 退到后台。
    */
   private fun handleBackKey() {
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
-        val webView = findWebView(window.decorView)
-        if (webView == null) {
-          moveTaskToBack(true)
-          return
-        }
-        webView.evaluateJavascript(
-          "(window.__fuyunHandleBack && window.__fuyunHandleBack()) || '0'",
-        ) { result ->
-          // 前端返回 '1' 表示已消费本次返回（关掉了扫码界面）
-          if (result?.trim('"') != "1") moveTaskToBack(true)
-        }
+        if (closeScanIfActive()) return
+        moveTaskToBack(true)
       }
     })
+  }
+
+  /** 父容器平时只有 WebView 一个子 View，扫码时插件会再加两个，据此判断 */
+  private fun closeScanIfActive(): Boolean {
+    val webView = findWebView(window.decorView) ?: return false
+    val parent = webView.parent as? ViewGroup ?: return false
+    if (parent.childCount <= 1) return false
+
+    webView.evaluateJavascript(
+      "window.__fuyunCancelScan && window.__fuyunCancelScan()",
+      null,
+    )
+    // 兜底：JS 侧异常时直接摘掉扫码视图，避免卡在相机画面
+    webView.postDelayed({
+      val p = webView.parent as? ViewGroup
+      if (p != null && p.childCount > 1) {
+        while (p.childCount > 1) p.removeViewAt(p.childCount - 1)
+      }
+    }, 600)
+    return true
   }
 
   private fun findWebView(v: View): WebView? {
