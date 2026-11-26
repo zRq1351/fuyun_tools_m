@@ -4,7 +4,36 @@
     <div v-if="!paired" class="page">
 
       <div class="card">
-        <label class="field">
+        <div class="card-title-row">
+          <h2 class="card-title">发现的电脑</h2>
+          <button class="btn-text" :disabled="discovering" @click="onDiscover">
+            {{ discovering ? '搜索中…' : '重新搜索' }}
+          </button>
+        </div>
+        <p v-if="discovering && !computers.length" class="hint">
+          正在搜索同一 Wi-Fi 下的电脑…
+        </p>
+        <p v-else-if="!computers.length" class="hint">
+          未发现电脑。请确认电脑端已开启「手机同步」，且手机与电脑连的是同一个 Wi-Fi。
+        </p>
+        <div
+          v-for="c in computers"
+          :key="`${c.host}:${c.port}`"
+          class="pc-item"
+          :class="{ selected: form.host === `${c.host}:${c.port}` }"
+          @click="selectPc(c)"
+        >
+          <div class="pc-item-main">
+            <div class="pc-name">{{ c.name }}</div>
+            <div class="pc-addr">{{ c.host }}:{{ c.port }}</div>
+          </div>
+          <span v-if="form.host === `${c.host}:${c.port}`" class="pc-check">已选择</span>
+        </div>
+
+        <button class="btn-text btn-clipboard" @click="manualMode = !manualMode">
+          {{ manualMode ? '收起手动输入' : '找不到电脑？手动输入地址' }}
+        </button>
+        <label v-if="manualMode" class="field">
           <span class="field-label">电脑地址</span>
           <input
             v-model="form.host"
@@ -14,9 +43,6 @@
             placeholder="192.168.1.100:45817"
           />
         </label>
-        <p class="hint">
-          在电脑端「设置 → 手机同步」中查看地址；手机与电脑需在同一 Wi-Fi
-        </p>
       </div>
 
       <div class="card">
@@ -124,6 +150,9 @@ const loopRunning = ref(false)
 const draft = ref('')
 const items = ref([])
 const fileInput = ref(null)
+const computers = ref([])
+const discovering = ref(false)
+const manualMode = ref(false)
 const mirroring = ref(false)
 const mirrorStatusText = ref('')
 const form = reactive({host: '', code: ''})
@@ -151,6 +180,7 @@ onMounted(async () => {
       }
     } catch {}
   }
+  if (!paired.value) onDiscover()
   // 监听 Rust 推送的新内容
   unlistenItem = await listen('sync-item', (event) => {
     const payload = event.payload
@@ -162,6 +192,29 @@ onMounted(async () => {
 onUnmounted(() => {
   if (unlistenItem) unlistenItem()
 })
+
+// 自动发现同一局域网内的电脑（mDNS 优先，子网扫描兜底）
+async function onDiscover() {
+  if (discovering.value) return
+  discovering.value = true
+  try {
+    const r = await api.discover(2000)
+    computers.value = r.computers || []
+    // 只发现一台时自动选中，用户只需输入配对码
+    if (computers.value.length === 1) {
+      selectPc(computers.value[0])
+    }
+  } catch (e) {
+    showToast(String(e))
+  } finally {
+    discovering.value = false
+  }
+}
+
+function selectPc(c) {
+  form.host = `${c.host}:${c.port}`
+  pcName.value = c.name
+}
 
 async function onPair() {
   error.value = ''
@@ -210,6 +263,8 @@ function onUnpair() {
   loopRunning.value = false
   items.value = []
   form.code = ''
+  computers.value = []
+  onDiscover()
 }
 
 async function onSendText() {

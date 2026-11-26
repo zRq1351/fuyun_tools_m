@@ -3,6 +3,7 @@
 //! 架构：Vue 前端 + Rust 核心。核心只做一件事——与 PC 端同步服务通信：
 //! 探测/配对/推送（手机→电脑）、前台轮询接收（电脑→手机，自动写剪贴板）。
 
+mod discovery;
 mod sync_client;
 mod sync_proto;
 
@@ -162,6 +163,14 @@ async fn sync_mirror_start(
     client.mirror_start(&host, port, &token).await
 }
 
+/// 自动发现局域网内的电脑（mDNS 优先，子网扫描兜底）
+#[tauri::command]
+async fn sync_discover(timeout_ms: Option<u64>) -> Result<serde_json::Value, String> {
+    let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(2000));
+    let list = discovery::discover(timeout).await;
+    Ok(serde_json::json!({ "computers": list }))
+}
+
 /// 查询电脑端投屏会话状态
 #[tauri::command]
 async fn sync_mirror_status(
@@ -314,6 +323,7 @@ pub fn run() {
             sync_push_image,
             sync_start_loop,
             sync_stop_loop,
+            sync_discover,
             sync_mirror_start,
             sync_mirror_status,
             sync_write_image_clipboard,

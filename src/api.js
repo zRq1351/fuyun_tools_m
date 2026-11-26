@@ -6,6 +6,9 @@ export const api = {
     probeStatus: (host, port) =>
         invoke('sync_probe_status', {host, port}),
 
+    /** 自动发现局域网内的电脑（mDNS 优先，子网扫描兜底） */
+    discover: (timeoutMs) => invoke('sync_discover', {timeoutMs}),
+
     /** 配对：配对码换令牌 */
     pair: (host, port, code) =>
         invoke('sync_pair', {host, port, code}),
