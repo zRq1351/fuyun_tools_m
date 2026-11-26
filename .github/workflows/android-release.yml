@@ -250,22 +250,6 @@ jobs:
           fail_on_unmatched_files: true
           files: artifacts/*.apk
           body: |
-            ## 浮云剪贴板 Android ${{ steps.ver.outputs.version }}
-
-            与电脑端「浮云剪贴板」互相同步剪贴板内容的 Android 客户端。
-            本包由 GitHub Actions 从 `${{ github.sha }}` 自动构建并签名。
-
-            ### 安装
-            | 包 | 适用机型 | 体积 |
-            |----|----------|------|
-            | `arm64-v8a` | **绝大多数手机（推荐）** | 约 18 MB |
-            | `armeabi-v7a` | 老款 32 位设备 | 约 12 MB |
-            | `x86_64` / `x86` | 模拟器 | 约 17 MB |
-            | `universal` | 不确定机型时用，全 ABI 合集 | 约 59 MB |
-
-            1. 按机型挑一个 `.apk` 下载（拿不准就下 `universal`）
-            2. 手机上允许「安装未知来源应用」后安装
-            3. 打开 App，输入电脑端「设置 → 手机同步」里的地址与 6 位配对码
 
             ### 构建信息
             - 版本：`${{ steps.ver.outputs.version }}`

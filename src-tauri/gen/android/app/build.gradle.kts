@@ -97,12 +97,10 @@ rust {
     rootDirRel = "../../../"
 }
 
-// barcode-scanner 默认依赖 play-services-mlkit（unbundled），模型需从 Google Play 服务下载，
-// 国内机型（无 GMS）会拿到 null 直接崩。改为 bundled 版：模型打进 APK，离线可用。
-configurations.configureEach {
-    exclude(group = "com.google.android.gms", module = "play-services-mlkit-barcode-scanning")
-}
-
+// barcode-scanner 默认只依赖 play-services-mlkit（thin），模型要从 Google Play 服务下载，
+// 国内机型拿不到模型会崩。补上 bundled 实现（模型打进 APK），运行时 MLKit 会优先选它。
+// 注意：bundled 包只含实现，公共 API（BarcodeScanning / BarcodeScanner）仍由 play-services 提供，
+// 所以两个依赖必须同时存在，不能 exclude。
 dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("androidx.webkit:webkit:1.14.0")
