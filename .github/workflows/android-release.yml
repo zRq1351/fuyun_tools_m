@@ -1,0 +1,235 @@
+name: '发布 Android APK'
+
+# 触发方式：
+#  1) 推送 v* 标签（如 v1.0.1）→ 构建签名 APK 并发布到 GitHub Release
+#  2) 手动触发（Actions → 发布 Android APK → Run workflow）→ 只构建并上传 Artifact
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.0.1，留空则取 package.json 的 version）'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: 构建签名 APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 安装 JDK 21（AGP 9 / Gradle 9 要求）
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 Android SDK 组件（platform / build-tools / NDK）
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+          # compileSdk = 37（见 src-tauri/gen/android/app/build.gradle.kts）
+          if ! sdkmanager --install "platforms;android-37" > /dev/null 2>&1; then
+            echo "platforms;android-37 不可用，尝试 platforms;android-37.0"
+            sdkmanager --install "platforms;android-37.0" > /dev/null
+          fi
+
+          sdkmanager --install "platform-tools" > /dev/null
+          sdkmanager --install "build-tools;36.0.0" > /dev/null
+          sdkmanager --install "build-tools;37.0.0" > /dev/null 2>&1 || true
+
+          # NDK：按新到旧尝试，选中哪个就把 NDK_HOME 传给后续步骤
+          NDK_DIR=""
+          for v in 28.2.13676358 27.3.13750724 27.2.12479018 26.3.11579264; do
+            if sdkmanager --install "ndk;$v" > /dev/null 2>&1; then
+              NDK_DIR="$ANDROID_HOME/ndk/$v"
+              echo "使用 NDK $v"
+              break
+            fi
+          done
+          if [ -z "$NDK_DIR" ]; then
+            echo "::error::未能安装任何可用 NDK，请检查 sdkmanager --list 输出"
+            sdkmanager --list | grep -E "ndk;" | tail -20 || true
+            exit 1
+          fi
+          echo "NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+
+          # Gradle 定位 SDK（local.properties 被 gitignore，CI 上按需生成）
+          echo "sdk.dir=$ANDROID_HOME" > src-tauri/gen/android/local.properties
+
+      - name: 安装 Rust 与 Android 编译目标
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: 缓存 Rust 构建
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+          key: android-apk
+          shared-key: android
+
+      - name: 解析版本号并写入 tauri.conf.json
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(node -p "require('./package.json').version")"
+          fi
+          echo "本次构建版本：$VERSION"
+          node -e '
+            const fs = require("fs");
+            const p = "src-tauri/tauri.conf.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            c.version = process.argv[1];
+            fs.writeFileSync(p, JSON.stringify(c, null, 2) + "\n");
+          ' "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Release 签名
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "::error title=缺少签名密钥::仓库未配置 ANDROID_KEYSTORE_BASE64。请在 Settings → Secrets and variables → Actions 添加："
+            echo "  ANDROID_KEYSTORE_BASE64     = base64 编码的 .keystore 文件"
+            echo "  ANDROID_KEYSTORE_PASSWORD   = keystore 口令"
+            echo "  ANDROID_KEY_ALIAS           = 密钥别名（如 fuyun）"
+            echo "  ANDROID_KEY_PASSWORD        = 密钥口令"
+            echo "本地生成 base64：base64 -w0 fuyun-clipboard.keystore > keystore.b64"
+            exit 1
+          fi
+
+          # 还原 keystore（Unix 换行；base64 输入里的换行/空格一并剔除）
+          printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
+          test -s "$GITHUB_WORKSPACE/release.keystore" || { echo "::error::keystore 解码为空"; exit 1; }
+
+          # 用 printf 写入，避免密码中的 $ ` \ 被 heredoc 二次展开
+          {
+            printf 'storeFile=%s\n' "$GITHUB_WORKSPACE/release.keystore"
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > src-tauri/gen/android/keystore.properties
+
+          echo "签名配置就绪：alias=$KEY_ALIAS"
+
+      - name: 构建 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install tauri android build --apk
+
+      - name: 整理产物
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p artifacts
+          found=0
+          while IFS= read -r f; do
+            case "$f" in
+              *universal*)  out="fuyun-clipboard-${VERSION}-universal.apk" ;;
+              *arm64*)      out="fuyun-clipboard-${VERSION}-arm64-v8a.apk" ;;
+              *armv7*|*armeabi*) out="fuyun-clipboard-${VERSION}-armeabi-v7a.apk" ;;
+              *x86_64*)     out="fuyun-clipboard-${VERSION}-x86_64.apk" ;;
+              *x86*)        out="fuyun-clipboard-${VERSION}-x86.apk" ;;
+              *)            out="fuyun-clipboard-${VERSION}-$(basename "$f")" ;;
+            esac
+            cp "$f" "artifacts/$out"
+            echo "产物：$out ($(du -h "$f" | cut -f1))"
+            found=1
+          done < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' | sort)
+          if [ "$found" -ne 1 ]; then
+            echo "::error::未找到任何 APK 产物"
+            find src-tauri/gen/android/app/build/outputs -maxdepth 4 -type d || true
+            exit 1
+          fi
+          ls -lh artifacts
+
+      - name: 校验 APK 签名
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::warning::未找到 apksigner，跳过签名校验"
+            exit 0
+          fi
+          for apk in artifacts/*.apk; do
+            echo "—— $apk"
+            "$APKSIGNER" verify --print-certs "$apk" | head -8
+          done
+
+      - name: 上传构建产物（Artifact）
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuyun-clipboard-apk-${{ steps.ver.outputs.version }}
+          path: artifacts/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 发布到 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 浮云剪贴板 ${{ steps.ver.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: artifacts/*.apk
+          body: |
+            ## 浮云剪贴板 Android ${{ steps.ver.outputs.version }}
+
+            与电脑端「浮云剪贴板」互相同步剪贴板内容的 Android 客户端。
+            本包由 GitHub Actions 从 `${{ github.sha }}` 自动构建并签名。
+
+            ### 安装
+            1. 下载 `.apk`（`universal` 一个包适配全部机型，体积较大；`arm64-v8a` 覆盖绝大多数手机）
+            2. 手机上允许「安装未知来源应用」后安装
+            3. 打开 App，输入电脑端「设置 → 手机同步」里的地址与 6 位配对码
+
+            ### 构建信息
+            - 版本：`${{ steps.ver.outputs.version }}`
+            - 提交：`${{ github.sha }}`
+            - 构建：`${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+
+            > 首次安装若提示与已装版本签名冲突，请先卸载旧包（调试签名包与正式签名包不能混装）。

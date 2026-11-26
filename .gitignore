@@ -27,3 +27,9 @@ local.properties
 
 # Release 签名凭据（含密码，永不入库）
 src-tauri/gen/android/keystore.properties
+
+# 本地打包产物与构建日志（APK 走 Release 资产，不入库）
+output/
+artifacts/
+*.log
+
