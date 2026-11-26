@@ -2,11 +2,6 @@
   <div class="app">
     <!-- 配对视图 -->
     <div v-if="!paired" class="page">
-      <div class="brand">
-        <div class="brand-icon">📋</div>
-        <h1>浮云剪贴板</h1>
-        <p class="brand-sub">与电脑互相同步剪贴板</p>
-      </div>
 
       <div class="card">
         <label class="field">
