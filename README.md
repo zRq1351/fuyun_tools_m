@@ -32,9 +32,12 @@ npm run tauri dev        # 桌面窗口调试（同一套前端+Rust，方便快
 # 首次：生成 gen/android 脚手架（需 ANDROID_HOME 指向 SDK）
 npm run tauri android init
 
+# 先打包前端（tauri android build 不会自动跑 vite build，dist/ 也不入库）
+npm run build
+
 # 构建
 npm run tauri android build --debug     # 调试包
-npm run tauri android build             # 发布包
+npm run tauri android build --apk       # 发布包（APK，未加 --apk 出的是 AAB）
 ```
 
 产物位于 `src-tauri/gen/android/app/build/outputs/apk/`。
