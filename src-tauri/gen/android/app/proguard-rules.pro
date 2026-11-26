@@ -19,3 +19,15 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ---------------------------------------------------------------------------
+# barcode-scanner（MLKit）
+# 插件没有自带 consumer-rules，R8 会把 MLKit 反射用到的类裁掉，
+# 表现为扫码时 java.lang.NullPointerException（BarcodeScannerPlugin 内）。
+# ---------------------------------------------------------------------------
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
+-keep class com.google.android.odml.** { *; }
+-keep class app.tauri.barcodescanner.** { *; }
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.android.gms.**

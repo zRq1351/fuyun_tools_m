@@ -368,6 +368,7 @@ fn write_image_to_clipboard(app: &AppHandle, bytes: &[u8]) -> Result<(), String>
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_barcode_scanner::init())
         .manage(SyncLoop {
             running: Arc::new(AtomicBool::new(false)),
             task: Arc::new(Mutex::new(None)),

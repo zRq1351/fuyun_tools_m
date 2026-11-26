@@ -23,3 +23,4 @@ base64 = "0.22.1"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 log = "0.4"
 mdns-sd = "0.11"
+tauri-plugin-barcode-scanner = "2.5.3"

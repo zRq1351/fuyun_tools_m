@@ -57,12 +57,17 @@
           />
         </label>
         <div class="btn-row mt-10">
-          <button class="btn-tonal flex" @click="onPastePairInfo">粘贴配对信息</button>
-          <button v-if="remembered.length" class="btn-tonal flex" @click="showDevicePicker = true">
-            已配对（{{ remembered.length }}）
-          </button>
+          <button class="btn-tonal flex" @click="onScanQr">扫码配对</button>
+          <button class="btn-tonal flex" @click="onPastePairInfo">粘贴信息</button>
         </div>
-        <p class="hint">配对码在电脑端显示，5 分钟内有效，仅可配对一次</p>
+        <button
+          v-if="remembered.length"
+          class="btn-text btn-clipboard"
+          @click="showDevicePicker = true"
+        >
+          已配对的电脑（{{ remembered.length }}）
+        </button>
+        <p class="hint">电脑端「手机同步」页会显示二维码，扫一下即可填入地址和配对码</p>
       </div>
 
       <button class="btn-primary" :disabled="pairing" @click="onPair">
@@ -205,6 +210,7 @@
 <script setup>
 import {computed, onMounted, onUnmounted, reactive, ref} from 'vue'
 import {listen} from '@tauri-apps/api/event'
+import {Format, requestPermissions, scan} from '@tauri-apps/plugin-barcode-scanner'
 import {api} from './api'
 
 const KEY_DEVICES = 'fuyun-devices-v2'
@@ -277,9 +283,17 @@ function showToast(msg) {
   toastTimer = setTimeout(() => (toast.value = ''), 2200)
 }
 
+/** Tauri 抛的错误可能是字符串、Error 或普通对象，统一取可读文本 */
+function errorText(e) {
+  if (!e) return ''
+  if (typeof e === 'string') return e
+  if (typeof e === 'object') return e.message || e.error || JSON.stringify(e)
+  return String(e)
+}
+
 /** 把底层错误翻译成用户能照着做的提示 */
 function humanizeError(e) {
-  const s = String(e || '')
+  const s = errorText(e)
   if (/401|403|令牌|token|unauthorized|配对已失效/i.test(s)) {
     return '配对已失效，请在电脑端重新生成配对码后再配一次'
   }
@@ -428,6 +442,47 @@ function selectPc(c) {
   form.host = `${c.host}:${c.port}`
 }
 
+/** 从任意文本里抽 IP:端口 与 6 位配对码（兼容 fuyun://pair?host=..&code=.. 与纯文本） */
+function applyPairInfo(text) {
+  const addr = text.match(/(\d{1,3}(?:\.\d{1,3}){3})\s*:\s*(\d{2,5})/)
+  const code = text.match(/(?:^|\D)(\d{6})(?:\D|$)/)
+  if (!addr && !code) return false
+  if (addr) {
+    form.host = `${addr[1]}:${addr[2]}`
+    manualMode.value = true
+  }
+  if (code) form.code = code[1]
+  showToast(addr && code ? '已填入地址与配对码，点「配对」即可' : addr ? '已填入电脑地址' : '已填入配对码')
+  return true
+}
+
+/** 扫码配对：电脑端「手机同步」页展示二维码 */
+async function onScanQr() {
+  try {
+    // 插件不会自动申请相机权限，必须显式请求，否则 scan() 直接抛错
+    const perm = await requestPermissions()
+    if (perm !== 'granted') {
+      showToast('需要相机权限才能扫码，请在系统设置里允许')
+      return
+    }
+    // windowed 模式在部分机型上 overlay 不显示（相机在跑但界面不可见），用原生全屏扫描界面
+    const res = await scan({windowed: false, formats: [Format.QRCode]})
+    // 用户取消时可能返回 null 而不是抛错
+    if (!res || !res.content) return
+    if (!applyPairInfo(res.content)) {
+      showToast('这个二维码不是浮云的配对码')
+    }
+  } catch (e) {
+    const msg = errorText(e)
+    if (/cancel|取消/i.test(msg)) return
+    if (/permission|camera|相机/i.test(msg)) {
+      showToast('需要相机权限才能扫码，请在系统设置里允许')
+      return
+    }
+    showToast(msg.slice(0, 80) || '扫码失败，请重试')
+  }
+}
+
 async function onPastePairInfo() {
   try {
     const text = await api.readClipboard()
@@ -435,16 +490,7 @@ async function onPastePairInfo() {
       showToast('剪贴板是空的')
       return
     }
-    const addr = text.match(/(\d{1,3}(?:\.\d{1,3}){3})\s*:\s*(\d{2,5})/)
-    const code = text.match(/(?:^|\D)(\d{6})(?:\D|$)/)
-    if (addr) {
-      form.host = `${addr[1]}:${addr[2]}`
-      manualMode.value = true
-    }
-    if (code) form.code = code[1]
-    if (addr || code) {
-      showToast(addr && code ? '已填入地址与配对码' : addr ? '已填入电脑地址' : '已填入配对码')
-    } else {
+    if (!applyPairInfo(text)) {
       showToast('剪贴板里没找到 IP:端口 或 6 位配对码')
     }
   } catch (e) {
