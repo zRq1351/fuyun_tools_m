@@ -26,7 +26,22 @@
             <div class="pc-name">{{ c.name }}</div>
             <div class="pc-addr">{{ c.host }}:{{ c.port }}</div>
           </div>
-          <span v-if="form.host === `${c.host}:${c.port}`" class="pc-check">已选择</span>
+          <!-- 选中后把「已选择」换成扫码按钮，扫电脑上显示的二维码自动填配对码 -->
+          <button
+            v-if="form.host === `${c.host}:${c.port}`"
+            class="btn-scan"
+            aria-label="扫码配对"
+            @click.stop="onScanQr"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 8V5a2 2 0 0 1 2-2h3" />
+              <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+              <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+              <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+            </svg>
+          </button>
         </div>
 
         <button class="btn-text btn-clipboard" @click="manualMode = !manualMode">
@@ -57,7 +72,8 @@
           />
         </label>
         <div class="btn-row mt-10">
-          <button class="btn-tonal flex" @click="onScanQr">扫码配对</button>
+          <!-- 选中电脑时扫码入口在电脑条目上；手动输入地址时这里补一个 -->
+          <button v-if="!form.host" class="btn-tonal flex" @click="onScanQr">扫码配对</button>
           <button class="btn-tonal flex" @click="onPastePairInfo">粘贴信息</button>
         </div>
         <button

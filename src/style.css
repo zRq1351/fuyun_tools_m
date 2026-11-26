@@ -141,6 +141,13 @@ body {
   padding-left: 20px;
 }
 
+/* 占位文字不跟随大字距，否则「6 位数字」会被拉成「6  位  数  字」 */
+.code-input::placeholder {
+  letter-spacing: normal;
+  font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
 .textarea {
   resize: none;
   margin-bottom: 12px;
@@ -458,6 +465,32 @@ body {
   font-size: 12px;
   color: var(--primary);
   white-space: nowrap;
+}
+
+/* 电脑条目右侧的扫码按钮（替代原来「已选择」的纯文字） */
+.btn-scan {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+
+.btn-scan:active {
+  background: var(--primary-dark);
+  transform: scale(0.94);
+}
+
+.btn-scan svg {
+  width: 21px;
+  height: 21px;
 }
 
 /* 设备切换弹层 */
