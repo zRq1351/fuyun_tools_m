@@ -31,6 +31,9 @@ export const api = {
     /** 读取本机剪贴板文本（用户点「发送当前剪贴板」时用） */
     readClipboard: () => invoke('clipboard_read_text'),
 
+    /** 读取本机剪贴板图片（返回 { width, height, imageBase64 }，PNG） */
+    readClipboardImage: () => invoke('clipboard_read_image'),
+
     /** 把文本写入本机剪贴板 */
     writeClipboard: (text) => invoke('clipboard_write_text', {text}),
 

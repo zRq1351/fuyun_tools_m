@@ -42,6 +42,14 @@ struct SyncItemEvent {
     height: Option<u32>,
 }
 
+/// 连接状态事件：轮询成功/失败时推给前端，避免界面"绿点常亮"的假在线
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct SyncStatusEvent {
+    online: bool,
+    failures: u32,
+}
+
 fn loop_state(app: &AppHandle) -> &SyncLoop {
     app.state::<SyncLoop>().inner()
 }
@@ -116,10 +124,22 @@ async fn sync_start_loop(
         let client = SyncClient::new();
         let mut last_id: i64 = 0;
         let mut failures = 0u32;
+        // 只在状态翻转时发事件，避免每 3 秒刷一次前端
+        let mut last_online: Option<bool> = None;
         while running.load(Ordering::SeqCst) {
             match client.history(&host, port, &token, last_id).await {
                 Ok(items) => {
                     failures = 0;
+                    if last_online != Some(true) {
+                        last_online = Some(true);
+                        let _ = app.emit(
+                            "sync-status",
+                            SyncStatusEvent {
+                                online: true,
+                                failures: 0,
+                            },
+                        );
+                    }
                     for item in items {
                         if item.id > last_id {
                             last_id = item.id;
@@ -129,6 +149,16 @@ async fn sync_start_loop(
                 }
                 Err(e) => {
                     failures += 1;
+                    if last_online != Some(false) {
+                        last_online = Some(false);
+                        let _ = app.emit(
+                            "sync-status",
+                            SyncStatusEvent {
+                                online: false,
+                                failures,
+                            },
+                        );
+                    }
                     log::warn!("同步轮询失败（第 {} 次）：{}", failures, e);
                     // 断线时退避：3s → 6s → 12s … 上限 30s
                     let backoff =
@@ -273,6 +303,32 @@ async fn clipboard_write_text(app: AppHandle, text: String) -> Result<(), String
         .map_err(|e| format!("写入剪贴板失败：{}", e))
 }
 
+/// 读取本机剪贴板图片并转成 PNG base64（「发送剪贴板图片」用）
+#[tauri::command]
+async fn clipboard_read_image(app: AppHandle) -> Result<serde_json::Value, String> {
+    let img = app
+        .clipboard()
+        .read_image()
+        .map_err(|e| format!("剪贴板里没有图片：{}", e))?;
+    let (width, height) = (img.width(), img.height());
+    let buf = image::RgbaImage::from_raw(width, height, img.rgba().to_vec())
+        .ok_or_else(|| "剪贴板图片数据异常".to_string())?;
+
+    let mut png: Vec<u8> = Vec::new();
+    image::DynamicImage::ImageRgba8(buf)
+        .write_to(
+            &mut std::io::Cursor::new(&mut png),
+            image::ImageFormat::Png,
+        )
+        .map_err(|e| format!("剪贴板图片转码失败：{}", e))?;
+
+    Ok(serde_json::json!({
+        "width": width,
+        "height": height,
+        "imageBase64": base64_encode(&png),
+    }))
+}
+
 // ---------- 工具 ----------
 
 fn base64_encode(bytes: &[u8]) -> String {
@@ -329,6 +385,7 @@ pub fn run() {
             sync_write_image_clipboard,
             clipboard_read_text,
             clipboard_write_text,
+            clipboard_read_image,
         ])
         .run(tauri::generate_context!())
         .expect("启动浮云剪贴板失败");

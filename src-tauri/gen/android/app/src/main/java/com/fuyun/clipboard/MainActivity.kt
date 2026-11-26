@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -15,6 +16,21 @@ class MainActivity : TauriActivity() {
     super.onCreate(savedInstanceState)
     ensureLocalNetworkPermission()
     applyTopInsetsPadding()
+    handleBackKey()
+  }
+
+  /**
+   * 返回键回桌面而不是 finish。
+   * TauriActivity 的 handleBackNavigation = false，默认行为是直接结束 Activity，
+   * 用户一按返回就把同步循环杀了，重新进来还得等重新连。
+   * 这里改成 moveTaskToBack：App 退到后台，回到前台仍是当前状态。
+   */
+  private fun handleBackKey() {
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        moveTaskToBack(true)
+      }
+    })
   }
 
   /**
