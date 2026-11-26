@@ -137,6 +137,14 @@ jobs:
           ' "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # dist/ 不进版本库，tauri android build 也不会自动跑 vite build
+      - name: 构建前端资源
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          test -f dist/index.html || { echo "::error::前端构建产物缺失（dist/index.html）"; exit 1; }
+
       - name: 配置 Release 签名
         shell: bash
         env:
