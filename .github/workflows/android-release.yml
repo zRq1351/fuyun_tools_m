@@ -182,7 +182,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # 第一步：universal 单包（全 ABI 合集，兼容所有机型）
           npx --no-install tauri android build --apk
+          # 第二步：分 ABI 小包（arm64-v8a 等，体积约为 universal 的 1/3）
+          # 第二次构建复用已编译的 Rust 产物，只额外花 Gradle 打包时间
+          npx --no-install tauri android build --apk --split-per-abi
 
       - name: 整理产物
         id: collect
@@ -196,6 +200,7 @@ jobs:
             case "$f" in
               *universal*)  out="fuyun-${VERSION}-universal.apk" ;;
               *arm64*)      out="fuyun-${VERSION}-arm64-v8a.apk" ;;
+              *app-arm-release*) out="fuyun-${VERSION}-armeabi-v7a.apk" ;;
               *armv7*|*armeabi*) out="fuyun-${VERSION}-armeabi-v7a.apk" ;;
               *x86_64*)     out="fuyun-${VERSION}-x86_64.apk" ;;
               *x86*)        out="fuyun-${VERSION}-x86.apk" ;;
@@ -251,7 +256,14 @@ jobs:
             本包由 GitHub Actions 从 `${{ github.sha }}` 自动构建并签名。
 
             ### 安装
-            1. 下载 `.apk`（`universal` 一个包适配全部机型，体积较大；`arm64-v8a` 覆盖绝大多数手机）
+            | 包 | 适用机型 | 体积 |
+            |----|----------|------|
+            | `arm64-v8a` | **绝大多数手机（推荐）** | 约 18 MB |
+            | `armeabi-v7a` | 老款 32 位设备 | 约 12 MB |
+            | `x86_64` / `x86` | 模拟器 | 约 17 MB |
+            | `universal` | 不确定机型时用，全 ABI 合集 | 约 59 MB |
+
+            1. 按机型挑一个 `.apk` 下载（拿不准就下 `universal`）
             2. 手机上允许「安装未知来源应用」后安装
             3. 打开 App，输入电脑端「设置 → 手机同步」里的地址与 6 位配对码
 
