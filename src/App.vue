@@ -297,7 +297,7 @@ const draft = ref('')
 const items = ref([])
 const previewItem = ref(null)
 const showDevicePicker = ref(false)
-const mirrorExpanded = ref(false)
+
 // 设备能力开关（扫码授权后按需启用）
 const syncEnabled = ref(localStorage.getItem('fuyun-cap-sync') !== '0')
 const mirrorEnabled = ref(localStorage.getItem('fuyun-cap-mirror') === '1')
