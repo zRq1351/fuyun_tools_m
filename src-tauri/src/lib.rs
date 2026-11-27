@@ -208,6 +208,17 @@ async fn sync_discover(timeout_ms: Option<u64>) -> Result<serde_json::Value, Str
     Ok(serde_json::json!({ "computers": list }))
 }
 
+/// 查询电脑端 adb 设备连接状态（USB / 无线调试都算）
+#[tauri::command]
+async fn sync_mirror_adb_status(
+    host: String,
+    port: u16,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let client = SyncClient::new();
+    client.mirror_adb_status(&host, port, &token).await
+}
+
 /// 设置电脑端投屏授权（扫码授权后按能力开关）
 #[tauri::command]
 async fn sync_mirror_authorize(
@@ -404,6 +415,7 @@ pub fn run() {
             sync_start_loop,
             sync_stop_loop,
             sync_discover,
+            sync_mirror_adb_status,
             sync_mirror_authorize,
             sync_mirror_start,
             sync_mirror_status,

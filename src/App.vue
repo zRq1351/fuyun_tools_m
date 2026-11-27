@@ -183,12 +183,12 @@
         </div>
 
         <div v-if="mirrorGuideOpen" class="cap-guide">
-          <p class="hint">投屏需要手机开启「调试」权限（只需设置一次）：</p>
+          <p class="hint">投屏需要手机开启「调试」权限（只需设置一次，USB 或无线任选其一）：</p>
           <ol class="guide-list">
             <li>设置 → 关于手机 → 连点「版本号」7 次，开启开发者模式</li>
-            <li>设置 → 系统 → 开发者选项 → 打开「USB 调试」</li>
-            <li>无线投屏（Android 11+）：再打开「无线调试」</li>
-            <li>插上数据线，在手机弹窗点「允许」</li>
+            <li><b>USB 方式</b>：开发者选项 → 打开「USB 调试」，插线后在手机弹窗点「允许」</li>
+            <li><b>无线方式（Android 11+）</b>：开发者选项 → 打开「无线调试」，与电脑同 Wi-Fi</li>
+            <li>设置完成后点下方「重新检测」，识别到设备即可开启投屏</li>
           </ol>
           <div class="btn-row">
             <button class="btn-tonal flex" @click="copyGuide">
@@ -304,6 +304,8 @@ const showDevicePicker = ref(false)
 const syncEnabled = ref(localStorage.getItem('fuyun-cap-sync') !== '0')
 const mirrorEnabled = ref(localStorage.getItem('fuyun-cap-mirror') === '1')
 const mirrorGuideOpen = ref(false)
+// 电脑端识别到的调试通道（USB / 无线），用于状态文案
+const adbLabel = ref('')
 // 能力开关请求进行中：禁止重复点击（避免并发授权/循环启停抖动）
 const capBusy = ref(false)
 const mirrorCapHint = computed(() => {
@@ -893,8 +895,20 @@ async function onToggleMirrorCap() {
     if (next) {
       showToast('已允许电脑投屏')
       await refreshMirrorStatus()
-      // 还没连上就展开调试引导（首次使用必看）
-      if (!mirrorRunning.value) mirrorGuideOpen.value = true
+      if (!mirrorRunning.value) {
+        // 已开 USB 或无线调试（电脑已识别设备）→ 不必展开引导
+        const adb = await api
+          .mirrorAdbStatus(c.host, c.port, c.token)
+          .catch(() => null)
+        if (adb && adb.ok && adb.connected) {
+          adbLabel.value = adb.wireless
+            ? `无线调试（${adb.serial}）`
+            : `USB 设备（${adb.serial}）`
+          showToast(`已检测到${adbLabel.value}，可以开启投屏`)
+        } else {
+          mirrorGuideOpen.value = true
+        }
+      }
     } else {
       mirrorGuideOpen.value = false
       showToast('已关闭投屏授权，电脑端将无法发起投屏')
@@ -918,14 +932,27 @@ async function copyGuide() {
   }
 }
 
-/** 调试完成后重新检测连接 */
+/** 调试完成后重新检测：同时看投屏会话与电脑端 adb 设备（USB / 无线调试） */
 async function recheckMirror() {
   await refreshMirrorStatus()
   if (mirrorRunning.value) {
     mirrorGuideOpen.value = false
     showToast('已连接，可以开始投屏')
-  } else {
-    showToast('仍未检测到连接，请确认已插线并允许调试')
+    return
+  }
+  try {
+    const c = requireCurrent()
+    const r = await api.mirrorAdbStatus(c.host, c.port, c.token)
+    if (r && r.ok && r.connected) {
+      adbLabel.value = r.wireless ? `无线调试（${r.serial}）` : `USB 设备（${r.serial}）`
+      mirrorGuideOpen.value = false
+      showToast(`已检测到${adbLabel.value}，可以开启投屏`)
+      return
+    }
+    adbLabel.value = ''
+    showToast('电脑暂未识别到设备：USB 请插线并点「允许」；无线调试请确认同 Wi-Fi，稍等几秒再试')
+  } catch (e) {
+    showToast(String(e))
   }
 }
 

@@ -45,6 +45,10 @@ export const api = {
     mirrorStart: (host, port, token) =>
         invoke('sync_mirror_start', {host, port, token}),
 
+    /** 查询电脑端 adb 设备连接状态（USB / 无线调试） */
+    mirrorAdbStatus: (host, port, token) =>
+        invoke('sync_mirror_adb_status', {host, port, token}),
+
     /** 设置电脑端投屏授权（扫码授权后按能力开关） */
     mirrorAuthorize: (host, port, token, enabled) =>
         invoke('sync_mirror_authorize', {host, port, token, enabled}),
