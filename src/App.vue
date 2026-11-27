@@ -136,24 +136,66 @@
         />
       </div>
 
-      <div class="card card-compact">
-        <div class="mirror-row" @click="mirrorExpanded = !mirrorExpanded">
-          <div class="mirror-main">
-            <span class="card-title inline">投屏到电脑</span>
-            <span v-if="mirrorRunning" class="badge badge-on">运行中</span>
-          </div>
-          <div class="mirror-actions">
-            <button class="btn-small" :disabled="mirroring" @click.stop="onMirrorStart">
-              {{ mirroring ? '开启中…' : mirrorRunning ? '重新开启' : '开启' }}
-            </button>
-            <span class="chevron" :class="{ open: mirrorExpanded }">›</span>
-          </div>
+      <!-- 设备能力：扫码授权后按能力开关（剪贴板同步 / 投屏） -->
+      <div class="card">
+        <div class="card-title-row">
+          <h2 class="card-title">设备能力</h2>
+          <span class="hint">扫码已授权</span>
         </div>
-        <div v-if="mirrorExpanded" class="mirror-detail">
-          <p class="hint">
-            通过同步连接远程开启电脑端的手机投屏，电脑会自动弹出投屏窗口。
-          </p>
-          <p v-if="mirrorStatusText" class="hint">{{ mirrorStatusText }}</p>
+
+        <div class="cap-item">
+          <div class="cap-text">
+            <div class="cap-name">剪贴板同步</div>
+            <div class="hint">电脑 ⇄ 手机复制粘贴互通</div>
+          </div>
+          <button
+            class="switch"
+            :class="{ on: syncEnabled }"
+            :aria-label="syncEnabled ? '关闭剪贴板同步' : '开启剪贴板同步'"
+            @click="onToggleSyncCap"
+          >
+            <span class="knob" />
+          </button>
+        </div>
+
+        <div class="cap-item">
+          <div class="cap-text">
+            <div class="cap-name">投屏</div>
+            <div class="hint">{{ mirrorCapHint }}</div>
+          </div>
+          <button
+            class="switch"
+            :class="{ on: mirrorEnabled }"
+            :aria-label="mirrorEnabled ? '关闭投屏授权' : '允许电脑投屏'"
+            @click="onToggleMirrorCap"
+          >
+            <span class="knob" />
+          </button>
+        </div>
+
+        <div v-if="mirrorEnabled" class="cap-actions">
+          <button class="btn-small" :disabled="mirroring" @click="onMirrorStart">
+            {{ mirroring ? '开启中…' : mirrorRunning ? '重新开启投屏' : '开启投屏' }}
+          </button>
+          <span v-if="mirrorStatusText" class="hint">{{ mirrorStatusText }}</span>
+        </div>
+
+        <div v-if="mirrorGuideOpen" class="cap-guide">
+          <p class="hint">投屏需要手机开启「调试」权限（只需设置一次）：</p>
+          <ol class="guide-list">
+            <li>设置 → 关于手机 → 连点「版本号」7 次，开启开发者模式</li>
+            <li>设置 → 系统 → 开发者选项 → 打开「USB 调试」</li>
+            <li>无线投屏（Android 11+）：再打开「无线调试」</li>
+            <li>插上数据线，在手机弹窗点「允许」</li>
+          </ol>
+          <div class="btn-row">
+            <button class="btn-tonal flex" @click="copyGuide">
+              复制步骤
+            </button>
+            <button class="btn-primary flex" @click="recheckMirror">
+              我已完成，重新检测
+            </button>
+          </div>
         </div>
       </div>
 
@@ -256,6 +298,15 @@ const items = ref([])
 const previewItem = ref(null)
 const showDevicePicker = ref(false)
 const mirrorExpanded = ref(false)
+// 设备能力开关（扫码授权后按需启用）
+const syncEnabled = ref(localStorage.getItem('fuyun-cap-sync') !== '0')
+const mirrorEnabled = ref(localStorage.getItem('fuyun-cap-mirror') === '1')
+const mirrorGuideOpen = ref(false)
+const mirrorCapHint = computed(() => {
+  if (!mirrorEnabled.value) return '开启后电脑可发起投屏'
+  if (mirrorRunning.value) return '投屏中'
+  return '已授权 · 等待电脑连接'
+})
 const mirroring = ref(false)
 const mirrorRunning = ref(false)
 const mirrorStatusText = ref('')
@@ -564,7 +615,12 @@ async function doPair(host, port, code) {
   localStorage.setItem(KEY_CURRENT, JSON.stringify(cfg))
   paired.value = true
   form.code = ''
-  await startLoop()
+  if (syncEnabled.value) {
+    await startLoop()
+  } else {
+    loopRunning.value = false
+  }
+  refreshMirrorStatus()
   return cfg
 }
 
@@ -818,6 +874,11 @@ async function refreshMirrorStatus() {
     const c = requireCurrent()
     const r = await api.mirrorStatus(c.host, c.port, c.token)
     mirrorRunning.value = !!(r && r.running)
+    // 电脑侧记录的授权状态为准（换手机/重装后仍一致）
+    if (r && typeof r.authorized === 'boolean') {
+      mirrorEnabled.value = r.authorized
+      localStorage.setItem('fuyun-cap-mirror', r.authorized ? '1' : '0')
+    }
     mirrorStatusText.value =
       r && r.running ? `投屏运行中${r.deviceName ? `（${r.deviceName}）` : ''}` : ''
   } catch {

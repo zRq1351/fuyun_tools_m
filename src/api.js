@@ -45,6 +45,10 @@ export const api = {
     mirrorStart: (host, port, token) =>
         invoke('sync_mirror_start', {host, port, token}),
 
+    /** 设置电脑端投屏授权（扫码授权后按能力开关） */
+    mirrorAuthorize: (host, port, token, enabled) =>
+        invoke('sync_mirror_authorize', {host, port, token, enabled}),
+
     /** 查询电脑端投屏会话状态 */
     mirrorStatus: (host, port, token) =>
         invoke('sync_mirror_status', {host, port, token}),

@@ -172,6 +172,32 @@ impl SyncClient {
         }
     }
 
+    /// 手机 → PC：设置投屏授权（扫码授权后按能力开关）
+    pub async fn mirror_authorize(
+        &self,
+        host: &str,
+        port: u16,
+        token: &str,
+        enabled: bool,
+    ) -> Result<serde_json::Value, String> {
+        let resp = self
+            .http
+            .post(format!("{}/api/mirror/authorize", Self::base(host, port)))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({ "enabled": enabled }))
+            .send()
+            .await
+            .map_err(|e| format!("请求失败：{}", describe_net_error(&e)))?;
+        match resp.status().as_u16() {
+            200 => resp
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|e| format!("响应解析失败：{}", describe_net_error(&e))),
+            401 => Err("认证失败，请重新配对".to_string()),
+            code => Err(format!("请求失败（HTTP {}）", code)),
+        }
+    }
+
     /// 手机 → PC：查询投屏会话状态
     pub async fn mirror_status(
         &self,
