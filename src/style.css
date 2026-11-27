@@ -701,3 +701,8 @@ body {
   line-height: 1.8;
   color: var(--text-secondary);
 }
+
+.switch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

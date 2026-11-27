@@ -151,6 +151,7 @@
           <button
             class="switch"
             :class="{ on: syncEnabled }"
+            :disabled="capBusy"
             :aria-label="syncEnabled ? '关闭剪贴板同步' : '开启剪贴板同步'"
             @click="onToggleSyncCap"
           >
@@ -166,6 +167,7 @@
           <button
             class="switch"
             :class="{ on: mirrorEnabled }"
+            :disabled="capBusy"
             :aria-label="mirrorEnabled ? '关闭投屏授权' : '允许电脑投屏'"
             @click="onToggleMirrorCap"
           >
@@ -302,6 +304,8 @@ const showDevicePicker = ref(false)
 const syncEnabled = ref(localStorage.getItem('fuyun-cap-sync') !== '0')
 const mirrorEnabled = ref(localStorage.getItem('fuyun-cap-mirror') === '1')
 const mirrorGuideOpen = ref(false)
+// 能力开关请求进行中：禁止重复点击（避免并发授权/循环启停抖动）
+const capBusy = ref(false)
 const mirrorCapHint = computed(() => {
   if (!mirrorEnabled.value) return '开启后电脑可发起投屏'
   if (mirrorRunning.value) return '投屏中'
@@ -847,6 +851,83 @@ function drawToJpegBase64(img, w, h) {
 }
 
 // ---------- 投屏 ----------
+
+/** 剪贴板同步开关：控制轮询循环（关闭后仍可手动发送，仅停止自动接收） */
+async function onToggleSyncCap() {
+  if (capBusy.value) return
+  capBusy.value = true
+  const next = !syncEnabled.value
+  try {
+    if (next) {
+      await startLoop()
+      syncEnabled.value = true
+      showToast('剪贴板同步已开启')
+    } else {
+      await api.stopSyncLoop()
+      loopRunning.value = false
+      syncEnabled.value = false
+      showToast('剪贴板同步已关闭')
+    }
+    localStorage.setItem('fuyun-cap-sync', syncEnabled.value ? '1' : '0')
+  } catch (e) {
+    showToast(String(e))
+  } finally {
+    capBusy.value = false
+  }
+}
+
+/** 投屏授权开关：向电脑登记授权，开启时给出调试权限引导 */
+async function onToggleMirrorCap() {
+  if (capBusy.value) return
+  const next = !mirrorEnabled.value
+  capBusy.value = true
+  try {
+    const c = requireCurrent()
+    const r = await api.mirrorAuthorize(c.host, c.port, c.token, next)
+    if (!r || r.ok === false) {
+      showToast((r && r.error) || '授权失败，请重新配对')
+      return
+    }
+    mirrorEnabled.value = next
+    localStorage.setItem('fuyun-cap-mirror', next ? '1' : '0')
+    if (next) {
+      showToast('已允许电脑投屏')
+      await refreshMirrorStatus()
+      // 还没连上就展开调试引导（首次使用必看）
+      if (!mirrorRunning.value) mirrorGuideOpen.value = true
+    } else {
+      mirrorGuideOpen.value = false
+      showToast('已关闭投屏授权，电脑端将无法发起投屏')
+    }
+  } catch (e) {
+    showToast(String(e))
+  } finally {
+    capBusy.value = false
+  }
+}
+
+/** 复制调试开启步骤到剪贴板 */
+async function copyGuide() {
+  try {
+    await api.writeClipboard(
+      '投屏设置步骤：\n1. 设置 → 关于手机 → 连点「版本号」7 次，开启开发者模式\n2. 设置 → 系统 → 开发者选项 → 打开「USB 调试」\n3. 无线投屏（Android 11+）：再打开「无线调试」\n4. 插上数据线，在手机弹窗点「允许」',
+    )
+    showToast('步骤已复制')
+  } catch (e) {
+    showToast(String(e))
+  }
+}
+
+/** 调试完成后重新检测连接 */
+async function recheckMirror() {
+  await refreshMirrorStatus()
+  if (mirrorRunning.value) {
+    mirrorGuideOpen.value = false
+    showToast('已连接，可以开始投屏')
+  } else {
+    showToast('仍未检测到连接，请确认已插线并允许调试')
+  }
+}
 
 async function onMirrorStart() {
   mirroring.value = true
