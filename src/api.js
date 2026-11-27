@@ -10,8 +10,8 @@ export const api = {
     discover: (timeoutMs) => invoke('sync_discover', {timeoutMs}),
 
     /** 配对：配对码换令牌 */
-    pair: (host, port, code) =>
-        invoke('sync_pair', {host, port, code}),
+    pair: (host, port, code, deviceName) =>
+        invoke('sync_pair', {host, port, code, deviceName}),
 
     /** 发送文本到电脑剪贴板 */
     pushText: (host, port, token, text) =>

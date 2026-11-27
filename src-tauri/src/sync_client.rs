@@ -58,9 +58,16 @@ impl SyncClient {
     }
 
     /// 配对：配对码换设备令牌
-    pub async fn pair(&self, host: &str, port: u16, code: &str) -> Result<PairResponse, String> {
+    pub async fn pair(
+        &self,
+        host: &str,
+        port: u16,
+        code: &str,
+        device_name: Option<&str>,
+    ) -> Result<PairResponse, String> {
         let body = PairRequest {
             code: code.to_string(),
+            device_name: device_name.map(|n| n.to_string()),
         };
         let resp = self
             .http

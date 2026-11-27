@@ -83,7 +83,7 @@
         >
           已配对的电脑（{{ remembered.length }}）
         </button>
-        <p class="hint">电脑端「手机同步」页会显示二维码，扫一下即可填入地址和配对码</p>
+        <p class="hint">电脑端「手机同步」页会显示二维码，扫一下即自动完成配对</p>
       </div>
 
       <button class="btn-primary" :disabled="pairing" @click="onPair">
@@ -475,7 +475,7 @@ function selectPc(c) {
 }
 
 /** 从任意文本里抽 IP:端口 与 6 位配对码（兼容 fuyun://pair?host=..&code=.. 与纯文本） */
-function applyPairInfo(text) {
+function applyPairInfo(text, opts = {}) {
   const addr = text.match(/(\d{1,3}(?:\.\d{1,3}){3})\s*:\s*(\d{2,5})/)
   const code = text.match(/(?:^|\D)(\d{6})(?:\D|$)/)
   if (!addr && !code) return false
@@ -484,8 +484,17 @@ function applyPairInfo(text) {
     manualMode.value = true
   }
   if (code) form.code = code[1]
-  showToast(addr && code ? '已填入地址与配对码，点「配对」即可' : addr ? '已填入电脑地址' : '已填入配对码')
+  if (!opts.silent) {
+    showToast(addr && code ? '已填入地址与配对码，点「配对」即可' : addr ? '已填入电脑地址' : '已填入配对码')
+  }
   return true
+}
+
+/** 设备名（电脑端设置页展示「已配对设备」，从 WebView UA 里解析机型） */
+function deviceName() {
+  const ua = navigator.userAgent || ''
+  const m = ua.match(/Android\s+[\d.]+;\s*([^;)]+?)(?:\s+Build|\s*\)|;)/)
+  return (m && m[1] ? m[1].trim() : 'Android 手机').slice(0, 40)
 }
 
 /** 扫码配对：电脑端「手机同步」页展示二维码 */
@@ -507,9 +516,12 @@ async function onScanQr() {
     const res = await scan({windowed: false, formats: [Format.QRCode]})
     // 用户取消时可能返回 null 而不是抛错
     if (!res || !res.content) return
-    if (!applyPairInfo(res.content)) {
+    if (!applyPairInfo(res.content, {silent: true})) {
       showToast('这个二维码不是浮云的配对码')
+      return
     }
+    // 二维码里带地址+配对码 → 自动完成配对，不必再点按钮
+    await autoPairAfterScan()
   } catch (e) {
     const msg = errorText(e)
     if (/cancel|取消/i.test(msg)) return
@@ -538,6 +550,24 @@ async function onPastePairInfo() {
   }
 }
 
+/** 实际配对：写入当前设备并启动同步循环（onPair 与扫码自动配对共用） */
+async function doPair(host, port, code) {
+  const result = await api.pair(host, port, code, deviceName())
+  const cfg = {
+    host,
+    port,
+    token: result.token,
+    pcName: result.pcName || '电脑',
+  }
+  current.value = cfg
+  rememberDevice(cfg)
+  localStorage.setItem(KEY_CURRENT, JSON.stringify(cfg))
+  paired.value = true
+  form.code = ''
+  await startLoop()
+  return cfg
+}
+
 async function onPair() {
   error.value = ''
   const raw = form.host.trim()
@@ -553,21 +583,29 @@ async function onPair() {
   }
   pairing.value = true
   try {
-    const result = await api.pair(host, port, form.code)
-    const cfg = {
-      host,
-      port,
-      token: result.token,
-      pcName: result.pcName || '电脑',
-    }
-    current.value = cfg
-    rememberDevice(cfg)
-    localStorage.setItem(KEY_CURRENT, JSON.stringify(cfg))
-    paired.value = true
-    form.code = ''
-    await startLoop()
+    await doPair(host, port, form.code)
   } catch (e) {
     error.value = humanizeError(e)
+  } finally {
+    pairing.value = false
+  }
+}
+
+/** 扫码后自动完成配对：地址与配对码齐全时直接配对，无需再点按钮 */
+async function autoPairAfterScan() {
+  const [host, portStr] = form.host.trim().split(':')
+  const port = Number(portStr)
+  if (!host || !port || form.code.length !== 6) return false
+  pairing.value = true
+  showToast('正在配对…')
+  try {
+    await doPair(host, port, form.code)
+    showToast('配对成功')
+    return true
+  } catch (e) {
+    error.value = humanizeError(e)
+    showToast(humanizeError(e))
+    return false
   } finally {
     pairing.value = false
   }

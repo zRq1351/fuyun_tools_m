@@ -32,6 +32,9 @@ pub struct HistoryItem {
 #[derive(Serialize)]
 pub struct PairRequest {
     pub code: String,
+    /// 设备名（电脑端设置页展示「已配对设备」，如 "Xiaomi 14"）
+    #[serde(rename = "deviceName", skip_serializing_if = "Option::is_none")]
+    pub device_name: Option<String>,
 }
 
 /// 配对响应（POST /api/pair 200）

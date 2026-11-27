@@ -69,9 +69,16 @@ async fn sync_probe_status(host: String, port: u16) -> Result<serde_json::Value,
 
 /// 配对：配对码换令牌
 #[tauri::command]
-async fn sync_pair(host: String, port: u16, code: String) -> Result<serde_json::Value, String> {
+async fn sync_pair(
+    host: String,
+    port: u16,
+    code: String,
+    device_name: Option<String>,
+) -> Result<serde_json::Value, String> {
     let client = SyncClient::new();
-    let result = client.pair(&host, port, code.trim()).await?;
+    let result = client
+        .pair(&host, port, code.trim(), device_name.as_deref())
+        .await?;
     Ok(serde_json::json!({
         "token": result.token,
         "pcName": result.pc_name,
@@ -316,10 +323,7 @@ async fn clipboard_read_image(app: AppHandle) -> Result<serde_json::Value, Strin
 
     let mut png: Vec<u8> = Vec::new();
     image::DynamicImage::ImageRgba8(buf)
-        .write_to(
-            &mut std::io::Cursor::new(&mut png),
-            image::ImageFormat::Png,
-        )
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
         .map_err(|e| format!("剪贴板图片转码失败：{}", e))?;
 
     Ok(serde_json::json!({
@@ -366,13 +370,20 @@ fn write_image_to_clipboard(app: &AppHandle, bytes: &[u8]) -> Result<(), String>
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    // barcode-scanner 插件整个 crate 带 `#![cfg(mobile)]`，桌面调试时不存在 init()，
+    // 因此扫码插件只在移动端注册（桌面 dev 用扫码入口会提示不支持，属预期）
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_barcode_scanner::init())
         .manage(SyncLoop {
             running: Arc::new(AtomicBool::new(false)),
             task: Arc::new(Mutex::new(None)),
-        })
+        });
+    #[cfg(mobile)]
+    {
+        builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+    }
+    builder
         .invoke_handler(tauri::generate_handler![
             sync_probe_status,
             sync_pair,
