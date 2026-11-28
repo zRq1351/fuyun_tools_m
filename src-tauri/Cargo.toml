@@ -1,6 +1,6 @@
 [package]
 name = "fuyun-tools-m"
-version = "1.0.0"
+version = "1.0.3"
 description = "浮云剪贴板移动端（Tauri）"
 authors = ["zrq"]
 edition = "2021"
